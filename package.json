@@ -1,15 +1,16 @@
 {
-	"name": "Vizu",
-	"version": "0.0.1",
-	"main": "index.html",
-	"description": "A Git repository visualization tool.",
-	"repository": "file://.",
-	"license": "MIT",
-	"dependencies": {
-		"nodegit": "0.11.9"
-	},
-	"window": {
-		"frame": true,
-		"toolbar": true
-	}
+  "name": "Vizu",
+  "version": "0.0.1",
+  "main": "index.html",
+  "description": "A Git repository visualization tool.",
+  "repository": "file://.",
+  "license": "MIT",
+  "dependencies": {
+    "bootstrap": "^3.3.6",
+    "nodegit": "^0.11.9"
+  },
+  "window": {
+    "frame": true,
+    "toolbar": true
+  }
 }
