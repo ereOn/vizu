@@ -7,7 +7,11 @@
   "license": "MIT",
   "dependencies": {
     "bootstrap": "^3.3.6",
+    "jquery": "^2.2.2",
     "nodegit": "^0.11.9"
+  },
+  "engines": {
+    "nw.js": "0.12.3"
   },
   "window": {
     "frame": true,

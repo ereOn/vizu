@@ -2,9 +2,22 @@
 <html>
 <head>
 <title>Hello World!</title>
+<link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css">
+<script src="node_modules/jquery/dist/jquery.min.js"></script>
+<script src="node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
 </head>
 <body>
-<h1>Hello World!</h1>
-We are using node.js <script>document.write(process.version)</script>.
+<div class="jumbotron">
+	<div class="container">
+		<h1>Vizu</h1>
+		<p>A git repository visualization tool</p>
+	</div>
+</div>
+<div class="container">
+	We are using node.js <script>document.write(process.version)</script>.
+</div>
+<script>
+var Git = require("nodegit");
+</script>
 </body>
 </html>
