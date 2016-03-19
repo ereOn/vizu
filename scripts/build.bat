@@ -1,1 +1,1 @@
-nwbuild -p win64 -v 0.12.3 .
+electron-packager.cmd . vizu --platform=win32 --arch=x64 --version=0.37.2

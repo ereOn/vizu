@@ -1,17 +1,20 @@
 {
-  "name": "Vizu",
+  "name": "vizu",
+  "displayName": "Vizu",
   "version": "0.0.1",
-  "main": "index.html",
+  "main": "main.js",
   "description": "A Git repository visualization tool.",
   "repository": "file://.",
   "license": "MIT",
+  "author": "Julien Kauffmann",
   "dependencies": {
     "bootstrap": "^3.3.6",
-    "jquery": "^2.2.2",
-    "nodegit": "^0.11.9"
+    "electron-prebuilt": "^0.37.2",
+    "git-exec": "^0.2.1",
+    "jquery": "^2.2.2"
   },
   "engines": {
-    "nw.js": "0.12.3"
+    "electron": "0.37.2"
   },
   "window": {
     "frame": true,

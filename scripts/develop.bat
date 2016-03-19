@@ -1,1 +1,2 @@
-nwbuild -p win64 -v 0.12.3 -r .
+call npm update
+electron .

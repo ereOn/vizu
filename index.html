@@ -3,8 +3,6 @@
 <head>
 <title>Hello World!</title>
 <link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css">
-<script src="node_modules/jquery/dist/jquery.min.js"></script>
-<script src="node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
 </head>
 <body>
 <div class="jumbotron">
@@ -17,7 +15,11 @@
 	We are using node.js <script>document.write(process.version)</script>.
 </div>
 <script>
-var Git = require("nodegit");
+window.$ = window.jQuery = require('jQuery');
+require('bootstrap');
+
+var Git = require('git-exec');
+
 </script>
 </body>
 </html>
