@@ -1,25 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Hello World!</title>
+<title>Vizu</title>
 <link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="vizu.css">
 </head>
 <body>
 <div class="jumbotron">
-	<div class="container">
-		<h1>Vizu</h1>
-		<p>A git repository visualization tool</p>
-	</div>
+    <div class="container">
+        <h1>Vizu</h1>
+        <p>A git repository visualization tool</p>
+    </div>
 </div>
 <div class="container">
-	We are using node.js <script>document.write(process.version)</script>.
+    <div id="output"></div>
 </div>
 <script>
 window.$ = window.jQuery = require('jQuery');
 require('bootstrap');
+var d3 = require('d3');
+var vizu = require('./vizu.js');
 
-var Git = require('git-exec');
+var repo = vizu.load_repository('../example1');
+repo.getRefsHeads(function (commits) {
+});
 
+var width = 800;
+var height = 600;
+
+var svg = d3.select("#output").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var nodes = [
+    {name: "a", x: 200, y: 100},
+    {name: "b", x: 300, y: 200}
+];
+var links = [
+    {source: 0, target: 1}
+];
+var force = d3.layout.force()
+    .nodes(nodes)
+    .links(links)
+    .linkDistance(200)
+    .size([width, height]);
+
+var link = svg.selectAll('.link')
+    .data(links)
+    .enter().append('line')
+    .attr('class', 'link');
+
+var node = svg.selectAll('.commit')
+    .data(nodes)
+    .enter().append('circle')
+    .attr('class', 'commit');
+
+force.on('tick', function() {
+    // When this function executes, the force layout
+    // calculations have concluded. The layout will
+    // have set various properties in our nodes and
+    // links objects that we can use to position them
+    // within the SVG container.
+
+    // First let's reposition the nodes. As the force
+    // layout runs it updates the `x` and `y` properties
+    // that define where the node should be centered.
+    // To move the node, we set the appropriate SVG
+    // attributes to their new values. We also have to
+    // give the node a non-zero radius so that it's visible
+    // in the container.
+
+    node.attr('r', width/25)
+        .attr('cx', function(d) { return d.x; })
+        .attr('cy', function(d) { return d.y; });
+
+    // We also need to update positions of the links.
+    // For those elements, the force layout sets the
+    // `source` and `target` properties, specifying
+    // `x` and `y` values in each case.
+
+    link.attr('x1', function(d) { return d.source.x; })
+        .attr('y1', function(d) { return d.source.y; })
+        .attr('x2', function(d) { return d.target.x; })
+        .attr('y2', function(d) { return d.target.y; });
+
+});
+
+force.start();
 </script>
 </body>
 </html>

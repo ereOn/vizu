@@ -1,0 +1,9 @@
+.commit {
+    stroke: gray;
+    stroke-width: 4px;
+    fill: silver;
+}
+.link {
+    stroke: gray;
+    stroke-width: 4px;
+}
