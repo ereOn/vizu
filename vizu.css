@@ -23,11 +23,21 @@
   fill: silver;
 }
 
+.commit.new {
+  fill: yellow;
+}
+
+.commit.head {
+  stroke: red;
+}
+
 .commit > text {
-  stroke-width: 1px;
+  stroke-width: 0;
   stroke: black;
-  fill: none;
+  fill: black;
   font-size: 1em;
+  font-weight: bold;
+  shape-rendering: crispEdges;
 }
 
 .commit > text.letter {
@@ -42,6 +52,14 @@
 
 .commit > text.msg {
   stroke: #333;
+  fill: #333;
+  text-anchor: start;
+  alignment-baseline: middle;
+}
+
+.commit > text.refnames {
+  stroke: green;
+  fill: green;
   text-anchor: start;
   alignment-baseline: middle;
 }

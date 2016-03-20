@@ -5,6 +5,7 @@ var npath = require('path');
 
 function Commit(objectname, attrs) {
   this.objectname = objectname;
+  this.head = false;
   this.index = null;
   this.children = [];
   this.depth = 0;
@@ -26,8 +27,9 @@ function Repository(filepath) {
 
   this.fetchRefnames = function() {
     return new Promise(function(resolve, reject) {
-      self.repo.exec('for-each-ref', ['--format="%(objectname) %(refname:short) %(objecttype)"', 'refs/heads'], function(stderr, stdout) {
+      self.repo.exec('for-each-ref', ['--format="%(objectname) %(refname:short) %(objecttype) %(HEAD)"', 'refs/heads'], function(stderr, stdout) {
         var refnames = {};
+        var head = null;
         var lines = stdout.split('\n');
 
         for (var i = 0; i < lines.length; ++i) {
@@ -35,6 +37,7 @@ function Repository(filepath) {
           var objectname = items[0];
           var refname = items[1];
           var objecttype = items[2];
+          var is_head = items[3];
 
           if (objecttype == 'commit') {
             if (objectname in refnames) {
@@ -42,10 +45,17 @@ function Repository(filepath) {
             } else {
               refnames[objectname] = [refname];
             }
+
+            if (is_head) {
+              head = objectname;
+            }
           }
         }
 
-        resolve(refnames);
+        resolve({
+          refnames: refnames,
+          head: head
+        });
       });
     });
   };
@@ -105,10 +115,15 @@ function Repository(filepath) {
           }
         }
 
-        self.fetchRefnames().then(function(refnames) {
-          for (var objectname in refnames) {
+        self.fetchRefnames().then(function(results) {
+          for (var objectname in results.refnames) {
             if (objectname in commits) {
-              commits[objectname].refnames = refnames[objectname];
+              var commit = commits[objectname];
+              commit.refnames = results.refnames[objectname];
+
+              if (objectname == results.head) {
+                commit.head = true;
+              }
             }
           }
 
