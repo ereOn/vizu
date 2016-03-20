@@ -7,86 +7,215 @@
 </head>
 <body>
 <div class="jumbotron">
-    <div class="container">
-        <h1>Vizu</h1>
-        <p>A git repository visualization tool</p>
-    </div>
+  <div class="container">
+  <h1>Vizu</h1>
+  <p>A git repository visualization tool</p>
+  </div>
 </div>
 <div class="container">
-    <div id="output"></div>
+  <div id="output"></div>
 </div>
 <script>
 window.$ = window.jQuery = require('jQuery');
 require('bootstrap');
 var d3 = require('d3');
+var chokidar = require('chokidar');
 var vizu = require('./vizu.js');
 
 var repo = vizu.load_repository('../example1');
-repo.getRefsHeads(function (commits) {
-});
+//var repo = vizu.load_repository('C:\\dev\\pylar');
 
-var width = 800;
-var height = 600;
+var svg = d3.select("#output")
+  .append("svg")
+  .attr("preserveAspectRatio", "xMinYMin meet");
 
-var svg = d3.select("#output").append("svg")
-    .attr("width", width)
-    .attr("height", height);
+var g = svg.append('g');
 
-var nodes = [
-    {name: "a", x: 200, y: 100},
-    {name: "b", x: 300, y: 200}
-];
-var links = [
-    {source: 0, target: 1}
-];
-var force = d3.layout.force()
-    .nodes(nodes)
-    .links(links)
-    .linkDistance(200)
-    .size([width, height]);
+var zoom = d3.behavior.zoom()
+  .on("zoom", function() {
+    g.attr("transform", "translate(" + d3.event.translate + ") scale(" + d3.event.scale + ")");
+  });
 
-var link = svg.selectAll('.link')
-    .data(links)
-    .enter().append('line')
+svg.call(zoom);
+
+var margin = 32;
+var radius = 16;
+var text_width = 256;
+var text_padding = 8;
+
+var update = function(results) {
+  var commits = d3.values(results.commits);
+  var max_depth = results.max_depth;
+  var min_depth = 0;
+  var max_order = results.max_order;
+  var min_order = 0;
+  var width = (max_order + 1 - min_order) * ((radius * 2) + text_width + 2 * text_padding) + 2 * margin;
+  var height = (max_depth - 1 - min_depth) * radius * 2 * 2 + 2 * margin;
+
+  svg.attr("viewBox", [0, 0, width, height])
+
+  var links = [];
+
+  for (var i = 0; i < commits.length; ++i) {
+    var commit = commits[i];
+
+    for (var j = 0; j < commit.parents.length; ++j) {
+      var parent_ = results.commits[commit.parents[j]];
+      links.push({source: commit, target: parent_, id: commit.objectname + "," + parent_.objectname});
+    }
+  }
+
+  var link_el = g.selectAll('.link')
+    .data(links, function(d) { return d.id; });
+
+  var deleted_link_el = link_el.exit();
+  var new_link_el = link_el.enter()
+    .insert('line', 'g.commit')
     .attr('class', 'link');
 
-var node = svg.selectAll('.commit')
-    .data(nodes)
-    .enter().append('circle')
+  var commit_el = g.selectAll('.commit')
+    .data(commits, function(d) { return d.objectname; });
+
+  var deleted_commit_el = commit_el.exit()
+    .filter(':not(.deleted)')
+    .classed('deleted', true);
+
+  var new_commit_el = commit_el.enter()
+    .append('g')
     .attr('class', 'commit');
 
-force.on('tick', function() {
-    // When this function executes, the force layout
-    // calculations have concluded. The layout will
-    // have set various properties in our nodes and
-    // links objects that we can use to position them
-    // within the SVG container.
+  new_commit_el.append('circle')
+    .attr('opacity', 1)
+    .attr('r', radius);
+  new_commit_el.append('text')
+    .attr('opacity', 1)
+    .attr('class', 'letter');
+  new_commit_el.append('text')
+    .attr('opacity', 1)
+    .attr('class', 'objectname');
+  new_commit_el.append('text')
+    .attr('opacity', 1)
+    .attr('class', 'msg');
 
-    // First let's reposition the nodes. As the force
-    // layout runs it updates the `x` and `y` properties
-    // that define where the node should be centered.
-    // To move the node, we set the appropriate SVG
-    // attributes to their new values. We also have to
-    // give the node a non-zero radius so that it's visible
-    // in the container.
+  // Inject the coordinates of the commits.
+  var xscale = d3.scale.linear()
+    .domain([min_order, max_order + 1])
+    .range([margin, width - margin]);
 
-    node.attr('r', width/25)
-        .attr('cx', function(d) { return d.x; })
-        .attr('cy', function(d) { return d.y; });
+  var yscale = d3.scale.linear()
+    .domain([min_depth, max_depth])
+    .range([height - margin, margin]);
 
-    // We also need to update positions of the links.
-    // For those elements, the force layout sets the
-    // `source` and `target` properties, specifying
-    // `x` and `y` values in each case.
+  for (var i = 0; i < commits.length; ++i) {
+    var commit = commits[i];
+    commit.x = xscale(commit.order);
+    commit.y = yscale(commit.depth);
+  }
 
-    link.attr('x1', function(d) { return d.source.x; })
-        .attr('y1', function(d) { return d.source.y; })
-        .attr('x2', function(d) { return d.target.x; })
-        .attr('y2', function(d) { return d.target.y; });
+  function wrap(width, padding) {
+    return function() {
+      var self = d3.select(this);
+      var text_length = self.node().getComputedTextLength();
+      var text = self.text();
 
-});
+      while (text_length > (width - 2 * padding) && text.length > 0) {
+        text = text.slice(0, -1);
+        self.text(text + "\u2026");
+        text_length = self.node().getComputedTextLength();
+      };
+    }
+  }
 
-force.start();
+  link_el
+    .transition()
+    .duration(500)
+    .attr('x1', function(d) { return d.source.x; })
+    .attr('y1', function(d) { return d.source.y; })
+    .attr('x2', function(d) { return d.target.x; })
+    .attr('y2', function(d) { return d.target.y; });
+
+  deleted_link_el
+    .transition()
+    .duration(500)
+    .remove();
+
+  new_commit_el
+    .style('stroke', 'yellow')
+    .style('fill', 'orange');
+
+  new_commit_el
+    .transition()
+    .duration(1500)
+    .style('stroke', 'black')
+    .style('fill', 'silver');
+
+  new_commit_el.select('circle')
+    .transition()
+    .duration(500)
+    .style('stroke', 'black');
+
+  commit_el.select('circle')
+    .transition()
+    .duration(500)
+    .attr('cx', function(d) { return d.x; })
+    .attr('cy', function(d) { return d.y; });
+
+  commit_el.select('text.letter')
+    .transition()
+    .duration(500)
+    .attr('x', function(d) { return d.x; })
+    .attr('y', function(d) { return d.y; })
+    .text(function(d) { return d.letter; })
+    .each(wrap(text_width, text_padding));
+
+  commit_el.select('text.objectname')
+    .transition()
+    .duration(500)
+    .attr('x', function(d) { return d.x + radius * 2; })
+    .attr('y', function(d) { return d.y; })
+    .text(function(d) { return d.objectname.slice(0, 6); })
+    .each(wrap(text_width, text_padding));
+
+  commit_el.select('text.msg')
+    .transition()
+    .duration(500)
+    .attr('x', function(d) { return d.x + radius * 2; })
+    .attr('y', function(d) { return d.y + radius; })
+    .text(function(d) { return d.msg; })
+    .each(wrap(text_width, text_padding));
+
+  deleted_commit_el
+    .transition()
+    .duration(500)
+    .remove();
+
+  deleted_commit_el.select('circle')
+    .transition()
+    .duration(500)
+    .attr('cx', width)
+    .attr('r', 0)
+    .attr('opacity', 0);
+
+  deleted_commit_el.selectAll('text')
+    .transition()
+    .duration(500)
+    .attr('x', width)
+    .attr('opacity', 0);
+}
+
+var refreshing = false;
+
+var refresh = function() {
+  if (!refreshing) {
+    refreshing = true;
+    repo.fetchCommits().then(update).then(function () {
+      refreshing = false;
+    });
+  }
+}
+
+refresh();
+chokidar.watch(repo.git_path, {ignoreInitial: true}).on('all', refresh);
 </script>
 </body>
 </html>

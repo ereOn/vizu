@@ -1,9 +1,53 @@
-.commit {
-    stroke: gray;
-    stroke-width: 4px;
-    fill: silver;
+#output {
+  display: inline-block;
+  position: relative;
+  width: 100%;
+  padding-bottom: 100%; /* aspect ratio */
+  vertical-align: top;
 }
+
+#output > svg {
+  border: 2px solid #eee;
+  border-radius: 8px;
+  display: inline-block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.commit {
+  stroke: gray;
+  stroke-width: 4px;
+  fill: silver;
+}
+
+.commit > text {
+  stroke-width: 1px;
+  stroke: black;
+  fill: none;
+  font-size: 1em;
+}
+
+.commit > text.letter {
+  text-anchor: middle;
+  alignment-baseline: middle;
+}
+
+.commit > text.objectname {
+  text-anchor: start;
+  alignment-baseline: middle;
+}
+
+.commit > text.msg {
+  stroke: #333;
+  text-anchor: start;
+  alignment-baseline: middle;
+}
+
 .link {
-    stroke: gray;
-    stroke-width: 4px;
+  stroke: gray;
+  stroke-width: 4px;
+  opacity: 0.5;
 }
