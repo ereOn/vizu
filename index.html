@@ -8,11 +8,17 @@
 <body>
 <div class="jumbotron">
   <div class="container">
-  <h1>Vizu</h1>
-  <p>A git repository visualization tool</p>
+    <h1>Vizu</h1>
+    <p>A git repository visualization tool</p>
+    <form id="load-repo" class="input-group" action="#">
+      <input id="repo-path" type="text" class="form-control" placeholder="Path to Git repository on disk">
+      <span class="input-group-btn">
+        <button class="btn btn-default" type="submit">Load</button>
+      </span>
+    </form>
   </div>
 </div>
-<div class="container">
+<div class="container-fluid">
   <div id="output"></div>
 </div>
 <script>
@@ -22,209 +28,219 @@ var d3 = require('d3');
 var chokidar = require('chokidar');
 var vizu = require('./vizu.js');
 
-var repo = vizu.load_repository('../example1');
-//var repo = vizu.load_repository('C:\\dev\\pylar');
+$('#load-repo').submit(function() {
+  load_repository($('#repo-path').val());
+});
 
-var svg = d3.select("#output")
-  .append("svg")
-  .attr("preserveAspectRatio", "xMinYMin meet");
+var load_repository = function(repo_path) {
+  console.log("Loading Git repository at:", repo_path);
+  var repo = vizu.load_repository(repo_path);
 
-var g = svg.append('g');
+  var output = d3.select("#output");
 
-var margin = 32;
-var radius = 16;
-var text_width = 256;
-var text_padding = 8;
+  output.selectAll("svg").remove();
 
-var update = function(results) {
-  var commits = d3.values(results.commits);
-  var max_depth = results.max_depth;
-  var min_depth = 0;
-  var max_order = results.max_order;
-  var min_order = 0;
-  var width = (max_order + 1 - min_order) * ((radius * 2) + text_width + 2 * text_padding) + 2 * margin;
-  var height = (max_depth - 1 - min_depth) * radius * 2 * 3 + 2 * margin;
+  var svg = output
+    .append("svg")
+    .attr("preserveAspectRatio", "xMinYMin meet");
 
-  svg.attr("viewBox", [0, 0, width, height])
+  var g = svg.append('g');
 
-  var links = [];
+  var margin = 32;
+  var radius = 16;
+  var text_width = 256;
+  var text_padding = 8;
 
-  for (var i = 0; i < commits.length; ++i) {
-    var commit = commits[i];
+  var update = function(results) {
+    var commits = d3.values(results.commits);
+    var max_depth = results.max_depth;
+    var min_depth = 0;
+    var max_order = results.max_order;
+    var min_order = 0;
+    var width = (max_order + 1 - min_order) * ((radius * 2) + text_width + 2 * text_padding) + 2 * margin;
+    var height = (max_depth - 1 - min_depth) * radius * 2 * 3 + 2 * margin;
 
-    for (var j = 0; j < commit.parents.length; ++j) {
-      var parent_ = commit.parents[j];
-      links.push({source: commit, target: parent_, id: commit.objectname + "," + parent_.objectname});
+    svg.attr("viewBox", [0, 0, width, height])
+
+    var links = [];
+
+    for (var i = 0; i < commits.length; ++i) {
+      var commit = commits[i];
+
+      for (var j = 0; j < commit.parents.length; ++j) {
+        var parent_ = commit.parents[j];
+        links.push({source: commit, target: parent_, id: commit.objectname + "," + parent_.objectname});
+      }
+    }
+
+    var link_el = g.selectAll('.link')
+      .data(links, function(d) { return d.id; });
+
+    var deleted_link_el = link_el.exit();
+    var new_link_el = link_el.enter()
+      .insert('line', 'g.commit')
+      .attr('opacity', 0)
+      .attr('class', 'link');
+
+    var commit_el = g.selectAll('.commit')
+      .data(commits, function(d) { return d.objectname; });
+
+    var deleted_commit_el = commit_el.exit()
+      .filter(':not(.deleted)')
+      .classed('deleted', true);
+
+    var new_commit_el = commit_el.enter()
+      .append('g')
+      .attr('class', 'commit new');
+
+    new_commit_el.append('circle')
+      .attr('opacity', 1)
+      .attr('r', radius);
+    new_commit_el.append('text')
+      .attr('opacity', 1)
+      .attr('class', 'letter');
+    new_commit_el.append('text')
+      .attr('opacity', 1)
+      .attr('class', 'objectname');
+    new_commit_el.append('text')
+      .attr('opacity', 1)
+      .attr('class', 'msg');
+    new_commit_el.append('text')
+      .attr('opacity', 1)
+      .attr('class', 'refnames');
+
+    // Inject the coordinates of the commits.
+    var xscale = d3.scale.linear()
+      .domain([min_order, max_order + 1])
+      .range([margin, width - margin]);
+
+    var yscale = d3.scale.linear()
+      .domain([min_depth, max_depth])
+      .range([height - margin, margin]);
+
+    for (var i = 0; i < commits.length; ++i) {
+      var commit = commits[i];
+      commit.x = xscale(commit.order);
+      commit.y = yscale(commit.depth);
+    }
+
+    function wrap(width, padding) {
+      return function() {
+        var self = d3.select(this);
+        var text_length = self.node().getComputedTextLength();
+        var text = self.text();
+
+        while (text_length > (width - 2 * padding) && text.length > 0) {
+          text = text.slice(0, -1);
+          self.text(text + "\u2026");
+          text_length = self.node().getComputedTextLength();
+        };
+      }
+    }
+
+    link_el
+      .classed('current', function(d) { return d.source.current; })
+      .transition()
+      .duration(500)
+      .attr('opacity', 0.4)
+      .attr('x1', function(d) { return d.source.x; })
+      .attr('y1', function(d) { return d.source.y; })
+      .attr('x2', function(d) { return d.target.x; })
+      .attr('y2', function(d) { return d.target.y; });
+
+    deleted_link_el
+      .transition()
+      .duration(100)
+      .attr('opacity', 0)
+      .remove();
+
+    new_commit_el
+      .transition()
+      .duration(1500)
+      .each('end', function() {
+          d3.select(this).classed('new', false);
+      });
+
+    new_commit_el.select('circle')
+      .transition()
+      .duration(500)
+      .style('stroke', 'black');
+
+    commit_el
+      .classed('head', function(d) { return d.head; })
+      .classed('current', function(d) { return d.current; });
+
+    commit_el.select('circle')
+      .transition()
+      .duration(500)
+      .attr('cx', function(d) { return d.x; })
+      .attr('cy', function(d) { return d.y; });
+
+    commit_el.select('text.letter')
+      .transition()
+      .duration(500)
+      .attr('x', function(d) { return d.x; })
+      .attr('y', function(d) { return d.y; })
+      .text(function(d) { return d.letter; })
+      .each(wrap(text_width, text_padding));
+
+    commit_el.select('text.objectname')
+      .transition()
+      .duration(500)
+      .attr('x', function(d) { return d.x + radius * 2; })
+      .attr('y', function(d) { return d.y; })
+      .text(function(d) { return d.objectname.slice(0, 6); })
+      .each(wrap(text_width, text_padding));
+
+    commit_el.select('text.msg')
+      .transition()
+      .duration(500)
+      .attr('x', function(d) { return d.x + radius * 2; })
+      .attr('y', function(d) { return d.y + radius; })
+      .text(function(d) { return d.msg; })
+      .each(wrap(text_width, text_padding));
+
+    commit_el.select('text.refnames')
+      .transition()
+      .duration(500)
+      .attr('x', function(d) { return d.x + radius * 2; })
+      .attr('y', function(d) { return d.y + radius * 2; })
+      .text(function(d) { return d.refnames.join(); })
+      .each(wrap(text_width, text_padding));
+
+    deleted_commit_el
+      .transition()
+      .duration(500)
+      .remove();
+
+    deleted_commit_el.select('circle')
+      .transition()
+      .duration(500)
+      .attr('cx', width)
+      .attr('r', 0)
+      .attr('opacity', 0);
+
+    deleted_commit_el.selectAll('text')
+      .transition()
+      .duration(500)
+      .attr('x', width)
+      .attr('opacity', 0);
+  }
+
+  var refreshing = false;
+
+  var refresh = function() {
+    if (!refreshing) {
+      refreshing = true;
+      repo.fetchCommits().then(update).then(function () {
+        refreshing = false;
+      });
     }
   }
 
-  var link_el = g.selectAll('.link')
-    .data(links, function(d) { return d.id; });
-
-  var deleted_link_el = link_el.exit();
-  var new_link_el = link_el.enter()
-    .insert('line', 'g.commit')
-    .attr('opacity', 0)
-    .attr('class', 'link');
-
-  var commit_el = g.selectAll('.commit')
-    .data(commits, function(d) { return d.objectname; });
-
-  var deleted_commit_el = commit_el.exit()
-    .filter(':not(.deleted)')
-    .classed('deleted', true);
-
-  var new_commit_el = commit_el.enter()
-    .append('g')
-    .attr('class', 'commit new');
-
-  new_commit_el.append('circle')
-    .attr('opacity', 1)
-    .attr('r', radius);
-  new_commit_el.append('text')
-    .attr('opacity', 1)
-    .attr('class', 'letter');
-  new_commit_el.append('text')
-    .attr('opacity', 1)
-    .attr('class', 'objectname');
-  new_commit_el.append('text')
-    .attr('opacity', 1)
-    .attr('class', 'msg');
-  new_commit_el.append('text')
-    .attr('opacity', 1)
-    .attr('class', 'refnames');
-
-  // Inject the coordinates of the commits.
-  var xscale = d3.scale.linear()
-    .domain([min_order, max_order + 1])
-    .range([margin, width - margin]);
-
-  var yscale = d3.scale.linear()
-    .domain([min_depth, max_depth])
-    .range([height - margin, margin]);
-
-  for (var i = 0; i < commits.length; ++i) {
-    var commit = commits[i];
-    commit.x = xscale(commit.order);
-    commit.y = yscale(commit.depth);
-  }
-
-  function wrap(width, padding) {
-    return function() {
-      var self = d3.select(this);
-      var text_length = self.node().getComputedTextLength();
-      var text = self.text();
-
-      while (text_length > (width - 2 * padding) && text.length > 0) {
-        text = text.slice(0, -1);
-        self.text(text + "\u2026");
-        text_length = self.node().getComputedTextLength();
-      };
-    }
-  }
-
-  link_el
-    .classed('current', function(d) { return d.source.current; })
-    .transition()
-    .duration(500)
-    .attr('opacity', 0.4)
-    .attr('x1', function(d) { return d.source.x; })
-    .attr('y1', function(d) { return d.source.y; })
-    .attr('x2', function(d) { return d.target.x; })
-    .attr('y2', function(d) { return d.target.y; });
-
-  deleted_link_el
-    .transition()
-    .duration(100)
-    .attr('opacity', 0)
-    .remove();
-
-  new_commit_el
-    .transition()
-    .duration(1500)
-    .each('end', function() {
-        d3.select(this).classed('new', false);
-    });
-
-  new_commit_el.select('circle')
-    .transition()
-    .duration(500)
-    .style('stroke', 'black');
-
-  commit_el
-    .classed('head', function(d) { return d.head; })
-    .classed('current', function(d) { return d.current; });
-
-  commit_el.select('circle')
-    .transition()
-    .duration(500)
-    .attr('cx', function(d) { return d.x; })
-    .attr('cy', function(d) { return d.y; });
-
-  commit_el.select('text.letter')
-    .transition()
-    .duration(500)
-    .attr('x', function(d) { return d.x; })
-    .attr('y', function(d) { return d.y; })
-    .text(function(d) { return d.letter; })
-    .each(wrap(text_width, text_padding));
-
-  commit_el.select('text.objectname')
-    .transition()
-    .duration(500)
-    .attr('x', function(d) { return d.x + radius * 2; })
-    .attr('y', function(d) { return d.y; })
-    .text(function(d) { return d.objectname.slice(0, 6); })
-    .each(wrap(text_width, text_padding));
-
-  commit_el.select('text.msg')
-    .transition()
-    .duration(500)
-    .attr('x', function(d) { return d.x + radius * 2; })
-    .attr('y', function(d) { return d.y + radius; })
-    .text(function(d) { return d.msg; })
-    .each(wrap(text_width, text_padding));
-
-  commit_el.select('text.refnames')
-    .transition()
-    .duration(500)
-    .attr('x', function(d) { return d.x + radius * 2; })
-    .attr('y', function(d) { return d.y + radius * 2; })
-    .text(function(d) { return d.refnames.join(); })
-    .each(wrap(text_width, text_padding));
-
-  deleted_commit_el
-    .transition()
-    .duration(500)
-    .remove();
-
-  deleted_commit_el.select('circle')
-    .transition()
-    .duration(500)
-    .attr('cx', width)
-    .attr('r', 0)
-    .attr('opacity', 0);
-
-  deleted_commit_el.selectAll('text')
-    .transition()
-    .duration(500)
-    .attr('x', width)
-    .attr('opacity', 0);
+  refresh();
+  chokidar.watch(repo.git_path, {ignoreInitial: true}).on('all', refresh);
 }
-
-var refreshing = false;
-
-var refresh = function() {
-  if (!refreshing) {
-    refreshing = true;
-    repo.fetchCommits().then(update).then(function () {
-      refreshing = false;
-    });
-  }
-}
-
-refresh();
-chokidar.watch(repo.git_path, {ignoreInitial: true}).on('all', refresh);
 </script>
 </body>
 </html>
