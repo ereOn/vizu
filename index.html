@@ -48,7 +48,7 @@ var load_repository = function(repo_path) {
 
   var margin = 32;
   var radius = 16;
-  var text_width = 256;
+  var min_text_width = 256;
   var text_padding = 8;
   var min_link_size = 48;
 
@@ -58,17 +58,15 @@ var load_repository = function(repo_path) {
     var min_depth = 0;
     var max_order = results.max_order;
     var min_order = 0;
-    var width = (max_order + 1 - min_order) * ((radius * 2) + text_width + 2 * text_padding) + 2 * margin;
+    var width = (max_order + 1 - min_order) * ((radius * 2) + min_text_width + 2 * text_padding) + 2 * margin;
     var height = (max_depth - min_depth + 1) * radius * 2 + (max_depth - min_depth) * min_link_size + 2 * margin;
-
-    console.log(commits);
-    console.log(max_depth);
-    console.log(max_order);
     var min_width = output.node().getBoundingClientRect().width;
 
     if (width < min_width) {
       width = min_width;
     }
+
+    var text_width = ((width - (2 * margin)) / (max_order + 1 - min_order)) - (radius * 4 - text_padding * 2);
 
     svg.attr("viewBox", [0, 0, width, height])
 
@@ -187,36 +185,36 @@ var load_repository = function(repo_path) {
       .attr('cy', function(d) { return d.y; });
 
     commit_el.select('text.letter')
+      .text(function(d) { return d.letter; })
+      .each(wrap(text_width, text_padding))
       .transition()
       .duration(500)
       .attr('x', function(d) { return d.x; })
-      .attr('y', function(d) { return d.y; })
-      .text(function(d) { return d.letter; })
-      .each(wrap(text_width, text_padding));
+      .attr('y', function(d) { return d.y; });
 
     commit_el.select('text.objectname')
+      .text(function(d) { return d.objectname.slice(0, 6); })
       .transition()
+      .each(wrap(text_width, text_padding))
       .duration(500)
       .attr('x', function(d) { return d.x + radius * 2; })
-      .attr('y', function(d) { return d.y; })
-      .text(function(d) { return d.objectname.slice(0, 6); })
-      .each(wrap(text_width, text_padding));
+      .attr('y', function(d) { return d.y; });
 
     commit_el.select('text.msg')
+      .text(function(d) { return d.msg; })
+      .each(wrap(text_width, text_padding))
       .transition()
       .duration(500)
       .attr('x', function(d) { return d.x + radius * 2; })
-      .attr('y', function(d) { return d.y + radius; })
-      .text(function(d) { return d.msg; })
-      .each(wrap(text_width, text_padding));
+      .attr('y', function(d) { return d.y + radius; });
 
     commit_el.select('text.refnames')
+      .text(function(d) { return d.refnames.join(); })
+      .each(wrap(text_width, text_padding))
       .transition()
       .duration(500)
       .attr('x', function(d) { return d.x + radius * 2; })
-      .attr('y', function(d) { return d.y + radius * 2; })
-      .text(function(d) { return d.refnames.join(); })
-      .each(wrap(text_width, text_padding));
+      .attr('y', function(d) { return d.y + radius * 2; });
 
     deleted_commit_el
       .transition()
