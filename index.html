@@ -18,7 +18,7 @@
     </form>
   </div>
 </div>
-<div class="container-fluid">
+<div class="container">
   <div id="output"></div>
 </div>
 <script>
@@ -50,6 +50,7 @@ var load_repository = function(repo_path) {
   var radius = 16;
   var text_width = 256;
   var text_padding = 8;
+  var min_link_size = 48;
 
   var update = function(results) {
     var commits = d3.values(results.commits);
@@ -58,7 +59,16 @@ var load_repository = function(repo_path) {
     var max_order = results.max_order;
     var min_order = 0;
     var width = (max_order + 1 - min_order) * ((radius * 2) + text_width + 2 * text_padding) + 2 * margin;
-    var height = (max_depth - 1 - min_depth) * radius * 2 * 3 + 2 * margin;
+    var height = (max_depth - min_depth + 1) * radius * 2 + (max_depth - min_depth) * min_link_size + 2 * margin;
+
+    console.log(commits);
+    console.log(max_depth);
+    console.log(max_order);
+    var min_width = output.node().getBoundingClientRect().width;
+
+    if (width < min_width) {
+      width = min_width;
+    }
 
     svg.attr("viewBox", [0, 0, width, height])
 
@@ -116,7 +126,7 @@ var load_repository = function(repo_path) {
 
     var yscale = d3.scale.linear()
       .domain([min_depth, max_depth])
-      .range([height - margin, margin]);
+      .range([height - margin - radius, margin + radius]);
 
     for (var i = 0; i < commits.length; ++i) {
       var commit = commits[i];
