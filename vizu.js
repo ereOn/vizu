@@ -6,10 +6,10 @@ var npath = require('path');
 function Commit(objectname, attrs) {
   this.objectname = objectname;
   this.head = false;
-  this.index = null;
+  this.current = false;
   this.children = [];
   this.depth = 0;
-  this.order = 0;
+  this.order = null;
   this.refnames = [];
   this.parents = [];
   this.msg = null;
@@ -27,9 +27,8 @@ function Repository(filepath) {
 
   this.fetchRefnames = function() {
     return new Promise(function(resolve, reject) {
-      self.repo.exec('for-each-ref', ['--format="%(objectname) %(refname:short) %(objecttype) %(HEAD)"', 'refs/heads'], function(stderr, stdout) {
+      self.repo.exec('for-each-ref', ['--format="%(objectname) %(refname:short) %(objecttype)"', 'refs/heads'], function(stderr, stdout) {
         var refnames = {};
-        var head = null;
         var lines = stdout.split('\n');
 
         for (var i = 0; i < lines.length; ++i) {
@@ -37,7 +36,6 @@ function Repository(filepath) {
           var objectname = items[0];
           var refname = items[1];
           var objecttype = items[2];
-          var is_head = items[3];
 
           if (objecttype == 'commit') {
             if (objectname in refnames) {
@@ -45,17 +43,21 @@ function Repository(filepath) {
             } else {
               refnames[objectname] = [refname];
             }
-
-            if (is_head) {
-              head = objectname;
-            }
           }
         }
 
-        resolve({
-          refnames: refnames,
-          head: head
-        });
+        resolve(refnames);
+      });
+    });
+  };
+
+  this.fetchHead = function() {
+    return new Promise(function(resolve, reject) {
+      self.repo.exec('rev-parse', ['HEAD'], function(stderr, stdout) {
+        var lines = stdout.split('\n');
+        var head = lines[0];
+
+        resolve(head);
       });
     });
   };
@@ -68,8 +70,8 @@ function Repository(filepath) {
         var max_order = 0;
         var letter_index = 65;
         var max_letter_index = 65 + 26;
-        var depth_counts = {};
         var lines = stdout.split('\n');
+        var roots = [];
 
         for (var i = 0; i < lines.length; ++i) {
           var items = lines[i].split(' ');
@@ -78,53 +80,76 @@ function Repository(filepath) {
           if (objecttype == 'commit') {
             var objectname = items.splice(0, 1)[0];
             var msg = lines[++i];
-            var parents = items;
-            var depth = Math.max.apply(Math, parents.map(function(parent_) {
-              return commits[parent_].depth + 1;
+            var parents = items.map(function(ref) { return commits[ref]; });
+            var depth = Math.max.apply(Math, parents.map(function(commit) {
+              return commit.depth + 1;
             }).concat(0));
 
             if (depth > max_depth) {
               max_depth = depth;
             }
 
-            if (depth in depth_counts) {
-              var order = depth_counts[depth];
-              depth_counts[depth]++;
-            } else {
-              var order = 0;
-              depth_counts[depth] = 1;
-            }
-
-            if (order > max_order) {
-              max_order = order;
-            }
-
             var attrs = {
               parents: parents,
               depth: depth,
-              order: order,
-              letter: letter_index <= max_letter_index ? String.fromCharCode(letter_index++) : '',
+              letter: letter_index < max_letter_index ? String.fromCharCode(letter_index++) : '',
               msg: msg
             };
 
-            commits[objectname] = new Commit(objectname, attrs);
+            var commit = commits[objectname] = new Commit(objectname, attrs);
 
             for (var j = 0; j < parents.length; ++j) {
-              commits[parents[j]].children.push(objectname);
+              parents[j].children.push(commit);
+            }
+
+            if (parents.length == 0) {
+              roots.push(commit);
             }
           }
         }
 
-        self.fetchRefnames().then(function(results) {
-          for (var objectname in results.refnames) {
+        var orders = {};
+        var set_orders = function(commit) {
+          if (commit.order == null) {
+            if (commit.depth in orders) {
+              commit.order = ++orders[commit.depth];
+            } else {
+              commit.order = orders[commit.depth] = 0;
+            }
+
+            if (commit.order > max_order) {
+              max_order = commit.order;
+            }
+
+            commit.children.forEach(set_orders);
+          }
+        }
+
+        roots.forEach(set_orders);
+
+        Promise.all([
+          self.fetchRefnames(),
+          self.fetchHead()
+        ]).then(function(results) {
+          var refnames = results[0];
+          var head = results[1];
+
+          for (var objectname in refnames) {
             if (objectname in commits) {
               var commit = commits[objectname];
-              commit.refnames = results.refnames[objectname];
-
-              if (objectname == results.head) {
-                commit.head = true;
-              }
+              commit.refnames = refnames[objectname];
             }
+          }
+
+          if (head in commits) {
+            var commit = commits[head];
+            commit.head = true;
+
+            var set_current = function(commit) {
+              commit.current = true;
+              commit.parents.forEach(set_current);
+            }
+            set_current(commit);
           }
 
           resolve({

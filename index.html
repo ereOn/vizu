@@ -31,13 +31,6 @@ var svg = d3.select("#output")
 
 var g = svg.append('g');
 
-var zoom = d3.behavior.zoom()
-  .on("zoom", function() {
-    g.attr("transform", "translate(" + d3.event.translate + ") scale(" + d3.event.scale + ")");
-  });
-
-svg.call(zoom);
-
 var margin = 32;
 var radius = 16;
 var text_width = 256;
@@ -60,7 +53,7 @@ var update = function(results) {
     var commit = commits[i];
 
     for (var j = 0; j < commit.parents.length; ++j) {
-      var parent_ = results.commits[commit.parents[j]];
+      var parent_ = commit.parents[j];
       links.push({source: commit, target: parent_, id: commit.objectname + "," + parent_.objectname});
     }
   }
@@ -71,6 +64,7 @@ var update = function(results) {
   var deleted_link_el = link_el.exit();
   var new_link_el = link_el.enter()
     .insert('line', 'g.commit')
+    .attr('opacity', 0)
     .attr('class', 'link');
 
   var commit_el = g.selectAll('.commit')
@@ -130,8 +124,10 @@ var update = function(results) {
   }
 
   link_el
+    .classed('current', function(d) { return d.source.current; })
     .transition()
     .duration(500)
+    .attr('opacity', 0.4)
     .attr('x1', function(d) { return d.source.x; })
     .attr('y1', function(d) { return d.source.y; })
     .attr('x2', function(d) { return d.target.x; })
@@ -139,7 +135,8 @@ var update = function(results) {
 
   deleted_link_el
     .transition()
-    .duration(500)
+    .duration(100)
+    .attr('opacity', 0)
     .remove();
 
   new_commit_el
@@ -155,7 +152,8 @@ var update = function(results) {
     .style('stroke', 'black');
 
   commit_el
-    .classed('head', function(d) { return d.head; });
+    .classed('head', function(d) { return d.head; })
+    .classed('current', function(d) { return d.current; });
 
   commit_el.select('circle')
     .transition()
