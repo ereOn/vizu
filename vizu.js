@@ -11,6 +11,7 @@ function Commit(objectname, attrs) {
   this.depth = 0;
   this.order = null;
   this.refnames = [];
+  this.parent_refs = [];
   this.parents = [];
   this.msg = null;
 
@@ -80,31 +81,45 @@ function Repository(filepath) {
           if (objecttype == 'commit') {
             var objectname = items.splice(0, 1)[0];
             var msg = lines[++i];
-            var parents = items.map(function(ref) { return commits[ref]; });
-            var depth = Math.max.apply(Math, parents.map(function(commit) {
-              return commit.depth + 1;
-            }).concat(0));
-
-            if (depth > max_depth) {
-              max_depth = depth;
-            }
+            var parent_refs = items;
 
             var attrs = {
-              parents: parents,
-              depth: depth,
+              parent_refs: parent_refs,
               letter: letter_index < max_letter_index ? String.fromCharCode(letter_index++) : '',
               msg: msg
             };
 
             var commit = commits[objectname] = new Commit(objectname, attrs);
 
-            for (var j = 0; j < parents.length; ++j) {
-              parents[j].children.push(commit);
-            }
-
-            if (parents.length == 0) {
+            if (parent_refs.length == 0) {
               roots.push(commit);
             }
+          }
+        }
+
+        for (var objectname in commits) {
+          var commit = commits[objectname];
+
+          for (var i = 0; i < commit.parent_refs.length; ++i) {
+            var parent_ = commits[commit.parent_refs[i]];
+
+            if (parent_) {
+              commit.parents.push(parent_);
+            } else {
+              console.log("Commit ", objectname, " refers to a parent commit ", commit.parent_refs[i], " which was not found !");
+            }
+          }
+
+          commit.depth = Math.max.apply(Math, commit.parents.map(function(c) {
+            return c.depth + 1;
+          }).concat(0));
+
+          if (commit.depth > max_depth) {
+            max_depth = commit.depth;
+          }
+
+          for (var i = 0; i < commit.parents.length; ++i) {
+            commit.parents[i].children.push(commit);
           }
         }
 
